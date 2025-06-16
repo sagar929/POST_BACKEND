@@ -1,0 +1,2 @@
+we are gonna make a app in which user can write the posts 
+we are gonna have the following functionality
