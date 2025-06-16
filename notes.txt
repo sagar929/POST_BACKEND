@@ -1,2 +1,7 @@
 we are gonna make a app in which user can write the posts 
 we are gonna have the following functionality
+1: user create krna ha
+2: login register and logout functionality
+3: post creation
+4: post like
+5: post delete only for the author of the post
