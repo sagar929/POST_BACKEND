@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const cookieParser = require('cookie-parser');
 const userModel = require('./models/user');
-// const postModel = require('./models/posts');
+const postModel = require('./models/post');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -15,9 +15,12 @@ app.get('/', (req, res) => {
     res.render("index");
 });
 
-app.get('/profile' , isLoggedIn,  (req, res) =>{
-      console.log(req.user);
-      res.render("Login");
+app.get('/profile' , isLoggedIn, async (req, res) =>{
+    //   console.log(req.user);
+   let user =   await userModel.findOne({email: req.user.email}).populate("posts");
+//    ab humare array me post aa gyi ha pr woh ek id ki trha ha toh hum kya krte ha yeh dekho ab
+ 
+      res.render("profile", { user });
 } )
 
 app.post('/register', async (req, res) => {
@@ -50,17 +53,27 @@ app.post('/register', async (req, res) => {
     });
 });
 
-app.post('/login', (req, res) =>{
-  let { email, password } = req.body;
+// Show login form
+app.get('/login', (req, res) => {
+    res.render("login");
+});
 
-  let user =  userModel.findOne({email});
+// Handle login POST request
+app.post('/login', async (req, res) => {
+    let { email, password } = req.body;
+
+    let user = await userModel.findOne({ email }); // Await is necessary
     if (!user) return res.status(400).send("User not found");
 
     bcrypt.compare(password, user.password, (err, result) => {
-        if(result) res.status(200).send("Login successful");
-        else res.redirect("/login");
+        if (result) {
+            let token = jwt.sign({ email: user.email, userid: user._id }, "shhhh");
+            res.cookie("token", token).send("Login successful");
+            res.status(200).redirect("/profile")
+        } else {
+            res.status(401).send("Incorrect password");
+        }
     });
-
 });
 
 app.get('/logout' ,  (req,res)=>{
@@ -68,22 +81,36 @@ app.get('/logout' ,  (req,res)=>{
     res.redirect("/login");
 })
 
+
+app.post('/createpost', isLoggedIn , async(req,res)=>{
+    let user = await userModel.findOne({email: req.user.email})
+    let {content} = req.body;
+   let post = await postModel.create({
+        user: user._id,
+        content: content,  
+    })
+    
+    user.posts.push(post._id);
+   await user.save();
+   res.redirect("/profile");
+})
+
 // now we will create a middleware to check if the user is authenticated
 function isLoggedIn(req, res, next) {
-       if(req.cookies.token=== "") res.send("You are not logged in, please login first");
-       else{
-        jwt.verify(req.cookies.token, "shhhh", (err, decoded) => {
-            if (err) {
-                return res.status(401).send("Invalid token");
-            }
-            // If token is valid, attach user info to request object
-            req.user = decoded;
-            next();
-        }); 
-       }
-       
+    if (!req.cookies.token || req.cookies.token === "") {
+        return res.send("You are not logged in, please login first"); // STOP here
+    }
 
-} 
+    jwt.verify(req.cookies.token, "shhhh", (err, decoded) => {
+        if (err) {
+            return res.status(401).send("Invalid token"); // STOP here
+        }
+
+        req.user = decoded;
+        next(); 
+    });
+}
+
 
 
 
